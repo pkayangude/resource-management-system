@@ -1,0 +1,97 @@
+@page "/"
+@inject IDashboardApiService DashboardService
+@inject IResourceApiService ResourceService
+
+<PageTitle>Dashboard – Resource Management</PageTitle>
+<MudText Typo="Typo.h5" Class="page-title">Dashboard</MudText>
+
+@if (_loading)
+{
+    <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+}
+else if (_summary is not null)
+{
+    <MudGrid Spacing="3">
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudText Typo="Typo.h3" Color="Color.Primary">@_summary.TotalActiveResources</MudText>
+                    <MudText Typo="Typo.subtitle1">Active Resources</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudText Typo="Typo.h3" Color="Color.Success">@_summary.ResourcesOnLeave</MudText>
+                    <MudText Typo="Typo.subtitle1">On Long Leave</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudText Typo="Typo.h3" Color="Color.Info">@_summary.UtilizationPercentage.ToString("F1")%</MudText>
+                    <MudText Typo="Typo.subtitle1">Utilization (Current Month)</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2" Style="@(_summary.ProjectsAtRisk > 0 ? "border: 2px solid #C62828" : "")">
+                <MudCardContent>
+                    <MudText Typo="Typo.h3" Color="@(_summary.ProjectsAtRisk > 0 ? Color.Error : Color.Success)">
+                        @_summary.ProjectsAtRisk
+                    </MudText>
+                    <MudText Typo="Typo.subtitle1">Projects Over Budget</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent><MudText Typo="Typo.h6">Forecast vs Actual (Current Month)</MudText></CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudText>Forecast Hours: <strong>@_summary.TotalForecastHoursCurrentMonth.ToString("F0")</strong></MudText>
+                    <MudText>Actual Hours (ILC): <strong>@_summary.TotalActualHoursCurrentMonth.ToString("F0")</strong></MudText>
+                    <MudProgressLinear Value="@((double)_summary.UtilizationPercentage)" Color="Color.Primary" Class="mt-2" />
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent><MudText Typo="Typo.h6">Quick Actions</MudText></CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudStack Spacing="2">
+                        <MudButton Href="/resources/onboard" Variant="Variant.Outlined" Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.PersonAdd">Onboard Resource</MudButton>
+                        <MudButton Href="/ilc" Variant="Variant.Outlined" Color="Color.Secondary"
+                                   StartIcon="@Icons.Material.Filled.Upload">Upload ILC Claims</MudButton>
+                        <MudButton Href="/forecast" Variant="Variant.Outlined" Color="Color.Info"
+                                   StartIcon="@Icons.Material.Filled.CalendarMonth">View Forecast</MudButton>
+                        <MudButton Href="/bandmix" Variant="Variant.Outlined" Color="Color.Dark"
+                                   StartIcon="@Icons.Material.Filled.BarChart">Calculate Band Mix</MudButton>
+                    </MudStack>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+}
+else
+{
+    <MudAlert Severity="Severity.Warning">Unable to load dashboard data. Check API connection.</MudAlert>
+}
+
+@code {
+    DashboardSummaryDto? _summary;
+    bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _summary = await DashboardService.GetSummaryAsync(); }
+        catch { }
+        finally { _loading = false; }
+    }
+}

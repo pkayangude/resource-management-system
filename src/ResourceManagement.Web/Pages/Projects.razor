@@ -1,0 +1,139 @@
+@page "/projects"
+@inject IProjectApiService ProjectService
+@inject ISnackbar Snackbar
+
+<PageTitle>Projects & Demands</PageTitle>
+<MudText Typo="Typo.h5" Class="page-title">Projects & Major Demands</MudText>
+
+<MudStack Row Justify="Justify.FlexEnd" Class="mb-3">
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => _showCreate = true"
+               StartIcon="@Icons.Material.Filled.Add">New Project</MudButton>
+</MudStack>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else
+{
+    <MudDataGrid T="ProjectDto" Items="_projects" Dense="true" Striped="true" Bordered="true" Filterable="true">
+        <Columns>
+            <PropertyColumn Property="p => p.ProjectCode" Title="Code" />
+            <PropertyColumn Property="p => p.ProjectName" Title="Project Name" />
+            <PropertyColumn Property="p => p.ProjectType" Title="Type" />
+            <PropertyColumn Property="p => p.Portfolio" Title="Portfolio" />
+            <PropertyColumn Property="p => p.TotalBudgetHours" Title="Budget Hrs" Format="F0" />
+            <PropertyColumn Property="p => p.ConsumedHours" Title="Consumed Hrs" Format="F0" />
+            <PropertyColumn Property="p => p.RemainingHours" Title="Remaining Hrs" Format="F0" />
+            <TemplateColumn Title="Budget Status">
+                <CellTemplate Context="ctx">
+                    @if (ctx.Item.IsOverBudget)
+                    {
+                        <MudChip T="string" Color="Color.Error" Size="Size.Small">OVER BUDGET</MudChip>
+                    }
+                    else
+                    {
+                        var pct = ctx.Item.TotalBudgetHours > 0
+                            ? ctx.Item.ConsumedHours / ctx.Item.TotalBudgetHours * 100
+                            : 0;
+                        <MudProgressLinear Value="@((double)pct)" Color="@(pct > 90 ? Color.Warning : Color.Success)" />
+                        <MudText Typo="Typo.caption">@pct.ToString("F0")%</MudText>
+                    }
+                </CellTemplate>
+            </TemplateColumn>
+            <TemplateColumn Title="Status">
+                <CellTemplate Context="ctx">
+                    <MudChip T="string" Size="Size.Small"
+                             Color="@(ctx.Item.Status == "Active" ? Color.Success : Color.Default)">
+                        @ctx.Item.Status
+                    </MudChip>
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+    </MudDataGrid>
+}
+
+@if (_showCreate)
+{
+    <MudDialog Options="new DialogOptions { MaxWidth = MaxWidth.Small }">
+        <DialogContent>
+            <MudText Typo="Typo.h6">Create New Project / Demand</MudText>
+            <MudStack Spacing="3" Class="mt-3">
+                <MudTextField @bind-Value="_create.ProjectCode" Label="Project Code" Required="true" />
+                <MudTextField @bind-Value="_create.ProjectName" Label="Project Name" Required="true" />
+                <MudTextField @bind-Value="_create.ProjectDbId" Label="Project DB ID" />
+                <MudSelect T="string" @bind-Value="_create.ProjectType" Label="Type" Required="true">
+                    <MudSelectItem Value="@("Standard")">Standard</MudSelectItem>
+                    <MudSelectItem Value="@("MajorDemand")">Major Demand</MudSelectItem>
+                    <MudSelectItem Value="@("Support")">Support</MudSelectItem>
+                    <MudSelectItem Value="@("Internal")">Internal</MudSelectItem>
+                </MudSelect>
+                <MudTextField @bind-Value="_create.ClaimCode" Label="Claim Code" />
+                <MudDatePicker @bind-Date="_projStart" Label="Start Date" Required="true" />
+                <MudDatePicker @bind-Date="_projEnd" Label="End Date" Required="true" />
+                <MudNumericField @bind-Value="_create.TotalBudgetHours" Label="Total Budget Hours" Required="true" />
+                <MudTextField @bind-Value="_create.Portfolio" Label="Portfolio" />
+            </MudStack>
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="() => _showCreate = false">Cancel</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateProject"
+                       Disabled="_creating">
+                @if (_creating) { <MudProgressCircular Size="Size.Small" Indeterminate /> }
+                Create
+            </MudButton>
+        </DialogActions>
+    </MudDialog>
+}
+
+@code {
+    List<ProjectDto> _projects = [];
+    bool _loading, _showCreate, _creating;
+    DateTime? _projStart = DateTime.Today, _projEnd = DateTime.Today.AddYears(1);
+
+    class CreateModel
+    {
+        public string ProjectCode = "";
+        public string ProjectName = "";
+        public string? ProjectDbId;
+        public string ProjectType = "Standard";
+        public string? ClaimCode;
+        public decimal TotalBudgetHours;
+        public string? Portfolio;
+    }
+
+    readonly CreateModel _create = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loading = true;
+        try { _projects = await ProjectService.GetAllAsync(); }
+        catch { }
+        finally { _loading = false; }
+    }
+
+    async Task CreateProject()
+    {
+        _creating = true;
+        try
+        {
+            await ProjectService.CreateAsync(new
+            {
+                projectCode = _create.ProjectCode,
+                projectName = _create.ProjectName,
+                projectDbId = _create.ProjectDbId,
+                projectType = _create.ProjectType,
+                claimCode = _create.ClaimCode,
+                startDate = _projStart!.Value,
+                endDate = _projEnd!.Value,
+                totalBudgetHours = _create.TotalBudgetHours,
+                portfolio = _create.Portfolio
+            });
+            Snackbar.Add("Project created successfully", Severity.Success);
+            _projects = await ProjectService.GetAllAsync();
+            _showCreate = false;
+        }
+        catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+        finally { _creating = false; }
+    }
+}

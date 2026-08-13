@@ -1,0 +1,114 @@
+@page "/resources"
+@inject IResourceApiService ResourceService
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>Resources – Resource Management</PageTitle>
+<MudText Typo="Typo.h5" Class="page-title">Resource List</MudText>
+
+<MudStack Row Justify="Justify.SpaceBetween" Class="mb-4">
+    <MudStack Row Spacing="2">
+        <MudTextField @bind-Value="_searchText" Placeholder="Search by name, team, band..."
+                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                      Immediate="true" DebounceInterval="300" OnDebounceIntervalElapsed="ApplyFilter" />
+        <MudCheckBox @bind-Value="_includeOffboarded" Label="Include Offboarded" />
+    </MudStack>
+    <MudStack Row Spacing="2">
+        <MudButton Href="/resources/import" Variant="Variant.Outlined" Color="Color.Secondary"
+                   StartIcon="@Icons.Material.Filled.Upload">Bulk Import</MudButton>
+        <MudButton Href="/resources/onboard" Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.PersonAdd">Onboard Resource</MudButton>
+    </MudStack>
+</MudStack>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    <MudDataGrid T="ResourceDto" Items="_filtered" Filterable="false" SortMode="SortMode.Multiple"
+                 Striped="true" Bordered="true" Dense="true" Hover="true">
+        <Columns>
+            <PropertyColumn Property="r => r.EmpId" Title="Emp ID" />
+            <PropertyColumn Property="r => r.FullName" Title="Full Name" />
+            <PropertyColumn Property="r => r.Band" Title="Band" />
+            <PropertyColumn Property="r => r.Team" Title="Team" />
+            <PropertyColumn Property="r => r.Location" Title="Location" />
+            <PropertyColumn Property="r => r.Manager" Title="Manager" />
+            <PropertyColumn Property="r => r.Status" Title="Status">
+                <CellTemplate Context="ctx">
+                    <MudChip T="string" Color="@GetStatusColor(ctx.Item.Status)" Size="Size.Small">
+                        @ctx.Item.Status
+                    </MudChip>
+                </CellTemplate>
+            </PropertyColumn>
+            <TemplateColumn Title="Actions">
+                <CellTemplate Context="ctx">
+                    <MudStack Row Spacing="1">
+                        <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small"
+                                       OnClick="() => ViewResource(ctx.Item.Id)" />
+                        <MudIconButton Icon="@Icons.Material.Filled.ExitToApp" Size="Size.Small"
+                                       Color="Color.Error"
+                                       OnClick="() => ConfirmOffboard(ctx.Item)" />
+                    </MudStack>
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+    </MudDataGrid>
+
+    <MudText Typo="Typo.body2" Class="mt-2 mud-text-disabled">
+        Showing @_filtered.Count of @_resources.Count resources
+    </MudText>
+}
+
+@code {
+    List<ResourceDto> _resources = [];
+    List<ResourceDto> _filtered = [];
+    string _searchText = string.Empty;
+    bool _includeOffboarded;
+    bool _loading = true;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    async Task LoadAsync()
+    {
+        _loading = true;
+        try { _resources = await ResourceService.GetAllAsync(_includeOffboarded); ApplyFilter(); }
+        catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+        finally { _loading = false; }
+    }
+
+    void ApplyFilter()
+    {
+        _filtered = string.IsNullOrWhiteSpace(_searchText)
+            ? _resources
+            : _resources.Where(r =>
+                (r.FullName?.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (r.Team?.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (r.Band?.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (r.EmpId?.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ?? false)
+            ).ToList();
+    }
+
+    void ViewResource(int id) => Nav.NavigateTo($"/resources/{id}");
+
+    async Task ConfirmOffboard(ResourceDto resource)
+    {
+        try
+        {
+            await ResourceService.OffboardAsync(resource.Id);
+            Snackbar.Add($"{resource.FullName} offboarded successfully", Severity.Success);
+            await LoadAsync();
+        }
+        catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+    }
+
+    Color GetStatusColor(string status) => status switch
+    {
+        "Active" => Color.Success,
+        "OnLeave" => Color.Warning,
+        "Offboarded" => Color.Error,
+        _ => Color.Default
+    };
+}

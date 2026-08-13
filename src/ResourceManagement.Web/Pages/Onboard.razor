@@ -1,0 +1,170 @@
+@page "/resources/onboard"
+@inject IResourceApiService ResourceService
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>Onboard Resource</PageTitle>
+<MudText Typo="Typo.h5" Class="page-title">Onboard New Resource</MudText>
+
+<MudPaper Class="pa-6" MaxWidth="600" Elevation="2">
+    <MudForm @ref="_form" @bind-IsValid="_formValid">
+        <MudGrid Spacing="3">
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_dto.EmpId" Label="Employee ID *" Required="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_dto.TalentId" Label="Talent ID" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_dto.FullName" Label="Full Name *" Required="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_dto.Corporate" Label="Corporate (IBM/Persistent)" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_dto.Pcode" Label="Pcode" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="string" @bind-Value="_dto.Country" Label="Country *" Required="true">
+                    <MudSelectItem Value="@("India")">India</MudSelectItem>
+                    <MudSelectItem Value="@("Canada")">Canada</MudSelectItem>
+                    <MudSelectItem Value="@("Philippines")">Philippines</MudSelectItem>
+                    <MudSelectItem Value="@("USA")">USA</MudSelectItem>
+                    <MudSelectItem Value="@("Landed")">Landed</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="string" @bind-Value="_dto.Location" Label="Location *" Required="true">
+                    <MudSelectItem Value="@("Bengaluru")">Bengaluru</MudSelectItem>
+                    <MudSelectItem Value="@("Pune")">Pune</MudSelectItem>
+                    <MudSelectItem Value="@("Hyderabad")">Hyderabad</MudSelectItem>
+                    <MudSelectItem Value="@("Chennai")">Chennai</MudSelectItem>
+                    <MudSelectItem Value="@("Kolkata")">Kolkata</MudSelectItem>
+                    <MudSelectItem Value="@("Noida")">Noida</MudSelectItem>
+                    <MudSelectItem Value="@("Gurgaon")">Gurgaon</MudSelectItem>
+                    <MudSelectItem Value="@("Mumbai")">Mumbai</MudSelectItem>
+                    <MudSelectItem Value="@("Ahmedabad")">Ahmedabad</MudSelectItem>
+                    <MudSelectItem Value="@("Canada")">Canada</MudSelectItem>
+                    <MudSelectItem Value="@("Philippines")">Philippines</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="string" @bind-Value="_dto.Band" Label="Band *" Required="true">
+                    <MudSelectItem Value="@("4")">Band 4</MudSelectItem>
+                    <MudSelectItem Value="@("5")">Band 5</MudSelectItem>
+                    <MudSelectItem Value="@("6G")">Band 6G</MudSelectItem>
+                    <MudSelectItem Value="@("6A")">Band 6A</MudSelectItem>
+                    <MudSelectItem Value="@("6B")">Band 6B</MudSelectItem>
+                    <MudSelectItem Value="@("7A")">Band 7A</MudSelectItem>
+                    <MudSelectItem Value="@("7B")">Band 7B</MudSelectItem>
+                    <MudSelectItem Value="@("8")">Band 8</MudSelectItem>
+                    <MudSelectItem Value="@("9")">Band 9</MudSelectItem>
+                    <MudSelectItem Value="@("10")">Band 10</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudNumericField @bind-Value="_dto.CostRate" Label="Cost Rate (CAD/hr)" Format="F2" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="string" @bind-Value="_dto.EmployeeType" Label="Employee Type">
+                    <MudSelectItem Value="@("RF")">RF – Regular</MudSelectItem>
+                    <MudSelectItem Value="@("CT")">CT – Contractor</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_dto.IntranetId" Label="Intranet ID (email)" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_dto.Manager" Label="Manager" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_dto.Team" Label="Team / POD" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_dto.Category" Label="Category (GDC/NonGDC)" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_dto.JobRoleSkillSet" Label="Job Role / Skill Set" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudDatePicker Label="Date of Joining" @bind-Date="_doj" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudDatePicker Label="Onboarding Date" @bind-Date="_onboarding" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudStack Row Spacing="2">
+                    <MudButton Href="/resources" Variant="Variant.Outlined">Cancel</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                               OnClick="SubmitOnboard" Disabled="!_formValid || _submitting">
+                        @if (_submitting) { <MudProgressCircular Size="Size.Small" Indeterminate /> }
+                        Onboard Resource
+                    </MudButton>
+                </MudStack>
+            </MudItem>
+        </MudGrid>
+    </MudForm>
+</MudPaper>
+
+@code {
+    MudForm? _form;
+    bool _formValid, _submitting;
+    DateTime? _doj = DateTime.Today, _onboarding = DateTime.Today;
+
+    class OnboardModel
+    {
+        public string EmpId = "";
+        public string TalentId = "";
+        public string FullName = "";
+        public string Corporate = "IBM";
+        public string Pcode = "";
+        public string Country = "India";
+        public string Location = "Pune";
+        public string Band = "6B";
+        public decimal CostRate;
+        public string? Manager;
+        public string? Team;
+        public string? Category;
+        public string? IppfCategory = null;
+        public string? JobRoleSkillSet;
+        public string? EmployeeType = "RF";
+        public string? IntranetId;
+    }
+
+    readonly OnboardModel _dto = new();
+
+    async Task SubmitOnboard()
+    {
+        await _form!.Validate();
+        if (!_formValid) return;
+        _submitting = true;
+        try
+        {
+            var created = await ResourceService.CreateAsync(new
+            {
+                empId = _dto.EmpId,
+                talentId = _dto.TalentId.Length > 0 ? _dto.TalentId : _dto.EmpId + "744",
+                fullName = _dto.FullName,
+                corporate = _dto.Corporate,
+                pcode = _dto.Pcode,
+                country = _dto.Country,
+                location = _dto.Location,
+                band = _dto.Band,
+                costRate = _dto.CostRate,
+                manager = _dto.Manager,
+                team = _dto.Team,
+                category = _dto.Category,
+                ippfCategory = _dto.IppfCategory,
+                jobRoleSkillSet = _dto.JobRoleSkillSet,
+                employeeType = _dto.EmployeeType,
+                intranetId = _dto.IntranetId,
+                dateOfJoining = _doj,
+                onboardingDate = _onboarding
+            });
+            Snackbar.Add($"Resource {_dto.FullName} onboarded successfully!", Severity.Success);
+            Nav.NavigateTo("/resources");
+        }
+        catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+        finally { _submitting = false; }
+    }
+}

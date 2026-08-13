@@ -1,0 +1,126 @@
+@page "/skillmatrix"
+@inject ISkillMatrixApiService SkillService
+@inject IResourceApiService ResourceService
+@inject ISnackbar Snackbar
+
+<PageTitle>Skill Matrix</PageTitle>
+<MudText Typo="Typo.h5" Class="page-title">Skill Matrix</MudText>
+<MudText Typo="Typo.body1" Class="mb-4 mud-text-disabled">
+    Manage and view skills, proficiency levels, and certifications across the team.
+</MudText>
+
+<MudTabs Elevation="1" Rounded="true">
+    <MudTabPanel Text="Search by Skill">
+        <MudPaper Class="pa-4" Elevation="0">
+            <MudStack Row Spacing="3" AlignItems="AlignItems.Center" Class="mb-3">
+                <MudTextField @bind-Value="_skillSearch" Label="Skill Name" Placeholder="e.g. SAP, .NET, Power BI"
+                              Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search" />
+                <MudButton Variant="Variant.Outlined" OnClick="SearchSkill">Search</MudButton>
+            </MudStack>
+            @if (_skillResults.Any())
+            {
+                <MudDataGrid T="SkillMatrixDto" Items="_skillResults" Dense="true" Striped="true" Bordered="true">
+                    <Columns>
+                        <PropertyColumn Property="s => s.ResourceName" Title="Resource" />
+                        <PropertyColumn Property="s => s.SkillCategory" Title="Category" />
+                        <PropertyColumn Property="s => s.SkillName" Title="Skill" />
+                        <PropertyColumn Property="s => s.ProficiencyLabel" Title="Proficiency" />
+                        <PropertyColumn Property="s => s.YearsOfExperience" Title="Years Exp." />
+                        <PropertyColumn Property="s => s.Certifications" Title="Certifications" />
+                    </Columns>
+                </MudDataGrid>
+            }
+        </MudPaper>
+    </MudTabPanel>
+    <MudTabPanel Text="Add Skill">
+        <MudPaper Class="pa-4" Elevation="0">
+            <MudStack Spacing="3" Style="max-width:500px">
+                <MudSelect T="int" @bind-Value="_add.ResourceId" Label="Resource" Required="true">
+                    @foreach (var r in _resources)
+                    {
+                        <MudSelectItem T="int" Value="@r.Id">@r.FullName</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudSelect T="string" @bind-Value="_add.SkillCategory" Label="Category" Required="true">
+                    <MudSelectItem Value="@("SAP")">SAP</MudSelectItem>
+                    <MudSelectItem Value="@("Microsoft")">Microsoft</MudSelectItem>
+                    <MudSelectItem Value="@("Cloud")">Cloud</MudSelectItem>
+                    <MudSelectItem Value="@("Data & Analytics")">Data & Analytics</MudSelectItem>
+                    <MudSelectItem Value="@("Integration")">Integration</MudSelectItem>
+                    <MudSelectItem Value="@("ServiceNow")">ServiceNow</MudSelectItem>
+                    <MudSelectItem Value="@("DevOps")">DevOps</MudSelectItem>
+                    <MudSelectItem Value="@("Management")">Management</MudSelectItem>
+                    <MudSelectItem Value="@("Other")">Other</MudSelectItem>
+                </MudSelect>
+                <MudTextField @bind-Value="_add.SkillName" Label="Skill Name" Required="true" />
+                <MudSelect T="int" @bind-Value="_add.ProficiencyLevel" Label="Proficiency" Required="true">
+                    <MudSelectItem T="int" Value="1">1 – Beginner</MudSelectItem>
+                    <MudSelectItem T="int" Value="2">2 – Intermediate</MudSelectItem>
+                    <MudSelectItem T="int" Value="3">3 – Advanced</MudSelectItem>
+                    <MudSelectItem T="int" Value="4">4 – Expert</MudSelectItem>
+                </MudSelect>
+                <MudNumericField @bind-Value="_add.YearsOfExperience" Label="Years of Experience" Min="0" Max="40" />
+                <MudTextField @bind-Value="_add.Certifications" Label="Certifications" />
+                <MudTextField @bind-Value="_add.Notes" Label="Notes" Lines="2" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddSkill" Disabled="_adding">
+                    @if (_adding) { <MudProgressCircular Size="Size.Small" Indeterminate /> }
+                    Add Skill
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    List<SkillMatrixDto> _skillResults = [];
+    List<ResourceDto> _resources = [];
+    string _skillSearch = string.Empty;
+    bool _adding;
+
+    class AddModel
+    {
+        public int ResourceId;
+        public string SkillCategory = "SAP";
+        public string SkillName = "";
+        public int ProficiencyLevel = 2;
+        public int YearsOfExperience = 1;
+        public string? Certifications;
+        public string? Notes;
+    }
+
+    readonly AddModel _add = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _resources = await ResourceService.GetAllAsync(); }
+        catch { }
+    }
+
+    async Task SearchSkill()
+    {
+        if (string.IsNullOrWhiteSpace(_skillSearch)) return;
+        try { _skillResults = await SkillService.GetBySkillAsync(_skillSearch); }
+        catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+    }
+
+    async Task AddSkill()
+    {
+        _adding = true;
+        try
+        {
+            await SkillService.CreateAsync(new
+            {
+                resourceId = _add.ResourceId,
+                skillCategory = _add.SkillCategory,
+                skillName = _add.SkillName,
+                proficiencyLevel = _add.ProficiencyLevel,
+                yearsOfExperience = _add.YearsOfExperience,
+                certifications = _add.Certifications,
+                notes = _add.Notes
+            });
+            Snackbar.Add("Skill added successfully", Severity.Success);
+        }
+        catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+        finally { _adding = false; }
+    }
+}

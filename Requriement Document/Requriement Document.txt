@@ -1,0 +1,27 @@
+Requriement Document
+
+Create a complete Resource management system, use .net latest technology and also code repository should be there in the GitHub, CICD pipeline must be there 
+ 
+which also include follwoing things 
+
+1) Onbording and offboring of the resouces.
+2) Forecast of the allocation as per the template
+3) Resource Intranet Labor Claiming (ILC) clocking validation, weekly xlsx file upload and validation for correct claim as per the Forecast
+4) Long Leave Management
+5) Demand and Major Project Allocation per resouce
+6) Calculate Band mix
+7) Prepare the Skill Matrix for the resocues
+
+Considaration -
+
+Forecast should consider Labour claim hours Weekend excel (xlsx) whcih was imported once a year. 
+Consider 9 hours per day and 45 hours per week for forecast.
+ILC should be also have data for projects and Demands, that should be validated. 
+Project or Major demand hours should not be exceed.
+One time bulk Resource upload using xlsx Template, each upload excel should be giveing option to MAP the coulumn and also show the preview of dataupload.
+All the Teamplate should be used from the given template folder.
+ 
+
+ 
+   
+  

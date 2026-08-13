@@ -1,0 +1,124 @@
+@page "/leave"
+@inject ILeaveApiService LeaveService
+@inject IResourceApiService ResourceService
+@inject ISnackbar Snackbar
+
+<PageTitle>Long Leave Management</PageTitle>
+<MudText Typo="Typo.h5" Class="page-title">Long Leave Management</MudText>
+
+<MudTabs Elevation="1" Rounded="true">
+    <MudTabPanel Text="Active Leaves">
+        <MudPaper Class="pa-4" Elevation="0">
+            @if (_loadingActive)
+            {
+                <MudProgressLinear Indeterminate="true" />
+            }
+            else
+            {
+                <MudDataGrid T="LeaveRecordDto" Items="_activeLeaves" Dense="true" Striped="true" Bordered="true">
+                    <Columns>
+                        <PropertyColumn Property="l => l.ResourceName" Title="Resource" />
+                        <PropertyColumn Property="l => l.LeaveType" Title="Leave Type" />
+                        <PropertyColumn Property="l => l.StartDate" Title="Start" Format="dd-MMM-yyyy" />
+                        <PropertyColumn Property="l => l.EndDate" Title="End" Format="dd-MMM-yyyy" />
+                        <PropertyColumn Property="l => l.TotalDays" Title="Days" />
+                        <PropertyColumn Property="l => l.ForecastImpactHours" Title="Impact (hrs)" Format="F0" />
+                        <TemplateColumn Title="Status">
+                            <CellTemplate Context="ctx">
+                                <MudChip T="string" Size="Size.Small"
+                                         Color="@GetLeaveStatusColor(ctx.Item.Status)">@ctx.Item.Status</MudChip>
+                            </CellTemplate>
+                        </TemplateColumn>
+                    </Columns>
+                </MudDataGrid>
+            }
+        </MudPaper>
+    </MudTabPanel>
+    <MudTabPanel Text="New Leave Request">
+        <MudPaper Class="pa-4" Elevation="0">
+            <MudStack Spacing="3" Style="max-width:500px">
+                <MudSelect T="int" @bind-Value="_newLeave.ResourceId" Label="Resource" Required="true">
+                    @foreach (var r in _resources)
+                    {
+                        <MudSelectItem T="int" Value="@r.Id">@r.FullName (@r.EmpId)</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudSelect T="string" @bind-Value="_newLeave.LeaveType" Label="Leave Type" Required="true">
+                    <MudSelectItem Value="@("Maternity")">Maternity</MudSelectItem>
+                    <MudSelectItem Value="@("Paternity")">Paternity</MudSelectItem>
+                    <MudSelectItem Value="@("Medical")">Medical</MudSelectItem>
+                    <MudSelectItem Value="@("LongLeave")">Long Leave</MudSelectItem>
+                    <MudSelectItem Value="@("Sabbatical")">Sabbatical</MudSelectItem>
+                    <MudSelectItem Value="@("Other")">Other</MudSelectItem>
+                </MudSelect>
+                <MudDatePicker Label="Start Date" @bind-Date="_startDate" Required="true" />
+                <MudDatePicker Label="End Date" @bind-Date="_endDate" Required="true" />
+                <MudTextField @bind-Value="_newLeave.Reason" Label="Reason" Lines="3" />
+                @if (_startDate.HasValue && _endDate.HasValue && _endDate > _startDate)
+                {
+                    var days = ((int)(_endDate.Value - _startDate.Value).TotalDays + 1);
+                    <MudAlert Severity="Severity.Info">
+                        Estimated @days calendar days → ~@(days * 9) forecast hours impacted
+                    </MudAlert>
+                }
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitLeave"
+                           Disabled="_submitting">
+                    @if (_submitting) { <MudProgressCircular Size="Size.Small" Indeterminate /> }
+                    Submit Leave Request
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    List<LeaveRecordDto> _activeLeaves = [];
+    List<ResourceDto> _resources = [];
+    bool _loadingActive, _submitting;
+    DateTime? _startDate, _endDate;
+
+    class NewLeaveModel { public int ResourceId; public string LeaveType = "LongLeave"; public string? Reason; }
+    readonly NewLeaveModel _newLeave = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loadingActive = true;
+        try
+        {
+            _activeLeaves = await LeaveService.GetActiveAsync();
+            _resources = await ResourceService.GetAllAsync();
+        }
+        catch { }
+        finally { _loadingActive = false; }
+    }
+
+    async Task SubmitLeave()
+    {
+        if (_newLeave.ResourceId == 0 || !_startDate.HasValue || !_endDate.HasValue) return;
+        _submitting = true;
+        try
+        {
+            await LeaveService.CreateAsync(new
+            {
+                resourceId = _newLeave.ResourceId,
+                leaveType = _newLeave.LeaveType,
+                startDate = _startDate.Value,
+                endDate = _endDate.Value,
+                reason = _newLeave.Reason
+            });
+            Snackbar.Add("Leave request submitted successfully", Severity.Success);
+            _activeLeaves = await LeaveService.GetActiveAsync();
+        }
+        catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+        finally { _submitting = false; }
+    }
+
+    Color GetLeaveStatusColor(string status) => status switch
+    {
+        "Approved" => Color.Success,
+        "Pending" => Color.Warning,
+        "Rejected" => Color.Error,
+        "Cancelled" => Color.Default,
+        _ => Color.Default
+    };
+}

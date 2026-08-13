@@ -1,0 +1,234 @@
+@page "/resources/import"
+@inject IImportApiService ImportService
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<PageTitle>Bulk Resource Import</PageTitle>
+<MudText Typo="Typo.h5" Class="page-title">Bulk Resource Import</MudText>
+<MudText Typo="Typo.body1" Class="mb-4 mud-text-disabled">
+    Upload an Excel (.xlsx) file. After upload, map the column headers to the required fields, 
+    preview the data, then confirm the import.
+</MudText>
+
+<MudStepper @ref="_stepper">
+    <MudStep Title="Upload File">
+        <MudPaper Class="pa-6 upload-dropzone" Elevation="0">
+            <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Large" Color="Color.Primary" />
+            <MudText Typo="Typo.h6" Class="mt-2">Drop your Excel file here or click to browse</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Supported: .xlsx — Max 10 MB</MudText>
+            <InputFile id="fileInput" accept=".xlsx" OnChange="HandleFileSelected" style="display:none" />
+            <label for="fileInput">
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="mt-3">
+                    Choose File
+                </MudButton>
+            </label>
+            @if (_fileName is not null)
+            {
+                <MudChip T="string" Icon="@Icons.Material.Filled.InsertDriveFile" Color="Color.Primary" Class="mt-2">
+                    @_fileName
+                </MudChip>
+            }
+        </MudPaper>
+        @if (_previewLoading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mt-2" />
+            <MudText Typo="Typo.body2">Parsing file...</MudText>
+        }
+    </MudStep>
+
+    <MudStep Title="Map Columns">
+        @if (_preview is not null)
+        {
+            <MudText Typo="Typo.subtitle1" Class="mb-3">
+                Map your Excel columns to the system fields. File has <strong>@_preview.TotalRows rows</strong>.
+            </MudText>
+            <MudTable Items="_fieldMappings" Dense="true" Bordered="true">
+                <HeaderContent>
+                    <MudTh>System Field</MudTh>
+                    <MudTh>Required</MudTh>
+                    <MudTh>Your Column</MudTh>
+                </HeaderContent>
+                <RowTemplate Context="field">
+                    <MudTd>@field.Label</MudTd>
+                    <MudTd>
+                        @if (field.Required)
+                        {
+                            <MudChip T="string" Color="Color.Error" Size="Size.Small">Required</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Color="Color.Default" Size="Size.Small">Optional</MudChip>
+                        }
+                    </MudTd>
+                    <MudTd>
+                        <MudSelect T="string" @bind-Value="field.MappedColumn" Dense="true"
+                                   Placeholder="-- Select column --">
+                            <MudSelectItem T="string" Value="@("")">-- Skip --</MudSelectItem>
+                            @foreach (var header in (_preview?.Headers ?? []))
+                            {
+                                <MudSelectItem T="string" Value="@header">@header</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudStep>
+
+    <MudStep Title="Preview Data">
+        @if (_preview?.SampleRows?.Any() == true)
+        {
+            <MudText Typo="Typo.subtitle1" Class="mb-3">
+                Preview first 5 rows with mapped columns:
+            </MudText>
+            <div class="preview-table" style="overflow-x:auto">
+                <table class="column-mapping-table">
+                    <thead>
+                        <tr>
+                            @foreach (var fm in _fieldMappings.Where(f => !string.IsNullOrEmpty(f.MappedColumn)))
+                            {
+                                <th>@fm.Label</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in _preview.SampleRows.Take(5))
+                        {
+                            <tr>
+                                @foreach (var fm in _fieldMappings.Where(f => !string.IsNullOrEmpty(f.MappedColumn)))
+                                {
+                                    <td>@(row.TryGetValue(fm.MappedColumn, out var v) ? v ?? "-" : "-")</td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </MudStep>
+
+    <MudStep Title="Import">
+        @if (_importResult is not null)
+        {
+            <MudAlert Severity="@(_importResult.Success ? Severity.Success : Severity.Warning)" Class="mb-3">
+                @_importResult.Summary
+            </MudAlert>
+            <MudStack Row Spacing="3">
+                <MudChip T="string" Color="Color.Success" Icon="@Icons.Material.Filled.CheckCircle">
+                    Imported: @_importResult.ImportedCount
+                </MudChip>
+                <MudChip T="string" Color="Color.Warning">Skipped: @_importResult.SkippedCount</MudChip>
+                <MudChip T="string" Color="Color.Error">Errors: @_importResult.ErrorCount</MudChip>
+            </MudStack>
+            @if (_importResult.Errors.Any())
+            {
+                <MudExpansionPanels Class="mt-3">
+                    <MudExpansionPanel Text="View Errors">
+                        @foreach (var err in _importResult.Errors)
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Error">• @err</MudText>
+                        }
+                    </MudExpansionPanel>
+                </MudExpansionPanels>
+            }
+            <MudButton Href="/resources" Variant="Variant.Filled" Color="Color.Primary" Class="mt-4">
+                View Resources
+            </MudButton>
+        }
+        else
+        {
+            <MudText>Ready to import @(_preview?.TotalRows ?? 0) rows.</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="DoImport"
+                       Disabled="_importLoading" Class="mt-3">
+                @if (_importLoading) { <MudProgressCircular Size="Size.Small" Indeterminate /> }
+                Confirm Import
+            </MudButton>
+        }
+    </MudStep>
+</MudStepper>
+
+@code {
+    MudStepper? _stepper;
+    string? _fileName;
+    IBrowserFile? _file;
+    ExcelPreviewResult? _preview;
+    ImportResult? _importResult;
+    bool _previewLoading, _importLoading;
+
+    class FieldMapping
+    {
+        public string Key { get; set; } = string.Empty;
+        public string Label { get; set; } = string.Empty;
+        public bool Required { get; set; }
+        public string MappedColumn { get; set; } = string.Empty;
+    }
+
+    readonly List<FieldMapping> _fieldMappings =
+    [
+        new() { Key = "EmpId", Label = "Employee ID", Required = true },
+        new() { Key = "TalentId", Label = "Talent ID", Required = false },
+        new() { Key = "FullName", Label = "Full Name", Required = true },
+        new() { Key = "Corporate", Label = "Corporate", Required = false },
+        new() { Key = "Pcode", Label = "Pcode", Required = false },
+        new() { Key = "Country", Label = "Country", Required = false },
+        new() { Key = "Location", Label = "Location", Required = false },
+        new() { Key = "Band", Label = "Band", Required = true },
+        new() { Key = "CostRate", Label = "Cost Rate (CAD)", Required = false },
+        new() { Key = "Manager", Label = "Manager", Required = false },
+        new() { Key = "Team", Label = "Team", Required = false },
+        new() { Key = "Category", Label = "Category", Required = false },
+        new() { Key = "IppfCategory", Label = "IPPF Category", Required = false },
+        new() { Key = "JobRoleSkillSet", Label = "Job Role / Skill Set", Required = false },
+        new() { Key = "EmployeeType", Label = "Employee Type (RF/CT)", Required = false },
+        new() { Key = "IntranetId", Label = "Intranet ID", Required = false },
+        new() { Key = "DeptCode", Label = "Dept Code", Required = false },
+        new() { Key = "JrssServiceArea", Label = "JRSS Service Area", Required = false },
+        new() { Key = "DateOfJoining", Label = "Date of Joining", Required = false }
+    ];
+
+    async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        _file = e.File;
+        _fileName = e.File.Name;
+        _previewLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            await using var stream = _file.OpenReadStream(maxAllowedSize: 10_485_760);
+            _preview = await ImportService.PreviewAsync(stream, _fileName);
+
+            // Auto-map columns by name similarity
+            foreach (var fm in _fieldMappings)
+            {
+                var match = _preview?.Headers?.FirstOrDefault(h =>
+                    h.Equals(fm.Label, StringComparison.OrdinalIgnoreCase) ||
+                    h.Equals(fm.Key, StringComparison.OrdinalIgnoreCase) ||
+                    h.Replace(" ", "").Equals(fm.Key, StringComparison.OrdinalIgnoreCase));
+                if (match is not null) fm.MappedColumn = match;
+            }
+
+            if (_preview?.ErrorMessage is null)
+                _stepper?.NextStepAsync();
+        }
+        catch (Exception ex) { Snackbar.Add($"Error reading file: {ex.Message}", Severity.Error); }
+        finally { _previewLoading = false; }
+    }
+
+    async Task DoImport()
+    {
+        if (_file is null) return;
+        _importLoading = true;
+        try
+        {
+            var mapping = _fieldMappings
+                .Where(f => !string.IsNullOrEmpty(f.MappedColumn))
+                .ToDictionary(f => f.Key, f => f.MappedColumn);
+
+            await using var stream = _file.OpenReadStream(maxAllowedSize: 10_485_760);
+            _importResult = await ImportService.ImportResourcesAsync(stream, _fileName!, mapping);
+        }
+        catch (Exception ex) { Snackbar.Add($"Import failed: {ex.Message}", Severity.Error); }
+        finally { _importLoading = false; }
+    }
+}

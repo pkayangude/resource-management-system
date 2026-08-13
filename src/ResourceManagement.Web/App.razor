@@ -1,0 +1,13 @@
+@using Microsoft.AspNetCore.Components.Web
+<Router AppAssembly="@typeof(App).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="@routeData" DefaultLayout="@typeof(ResourceManagement.Web.Shared.MainLayout)" />
+        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <PageTitle>Not found</PageTitle>
+        <LayoutView Layout="@typeof(ResourceManagement.Web.Shared.MainLayout)">
+            <MudText Typo="Typo.h5" Color="Color.Error">Page not found.</MudText>
+        </LayoutView>
+    </NotFound>
+</Router>

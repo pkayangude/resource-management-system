@@ -1,0 +1,84 @@
+@page "/bandmix"
+@inject IBandMixApiService BandMixService
+@inject ISnackbar Snackbar
+
+<PageTitle>Band Mix – Resource Management</PageTitle>
+<MudText Typo="Typo.h5" Class="page-title">Band Mix Calculator</MudText>
+<MudText Typo="Typo.body1" Class="mb-4 mud-text-disabled">
+    Calculates the weighted band mix across all active resources.
+    Formula: BandMix = Σ(Weightage × FTE) / Total FTE
+</MudText>
+
+<MudStack Row Spacing="3" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudNumericField @bind-Value="_year" Label="Year" Min="2024" Max="2030" Style="width:120px" />
+    <MudNumericField @bind-Value="_month" Label="Month" Min="1" Max="12" Style="width:100px" />
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Calculate" Disabled="_loading">
+        @if (_loading) { <MudProgressCircular Size="Size.Small" Indeterminate /> }
+        Calculate
+    </MudButton>
+</MudStack>
+
+@if (_results.Any())
+{
+    <MudGrid Spacing="3" Class="mb-4">
+        <MudItem xs="12" sm="4">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudText Typo="Typo.h4" Color="Color.Primary">
+                        @_results.FirstOrDefault()?.BandMix.ToString("F3")
+                    </MudText>
+                    <MudText Typo="Typo.subtitle1">Overall Band Mix Score</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudText Typo="Typo.h4" Color="Color.Info">@_results.Sum(r => r.Fte)</MudText>
+                    <MudText Typo="Typo.subtitle1">Total FTE</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudText Typo="Typo.h4" Color="Color.Success">@_results.Sum(r => r.TotalBandValue).ToString("F2")</MudText>
+                    <MudText Typo="Typo.subtitle1">Total Band Value</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <MudDataGrid T="BandMixDto" Items="_results" Dense="true" Striped="true" Bordered="true">
+        <Columns>
+            <PropertyColumn Property="b => b.Band" Title="Band" />
+            <PropertyColumn Property="b => b.Fte" Title="FTE Count" />
+            <PropertyColumn Property="b => b.Weightage" Title="Weightage" Format="F1" />
+            <PropertyColumn Property="b => b.TotalBandValue" Title="Total Band Value" Format="F2" />
+            <PropertyColumn Property="b => b.BandPercentage" Title="Band %" Format="F2" />
+            <TemplateColumn Title="% Visual">
+                <CellTemplate Context="ctx">
+                    <MudProgressLinear Value="@((double)ctx.Item.BandPercentage)"
+                                       Color="Color.Primary" Rounded="true" />
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+    </MudDataGrid>
+}
+
+@code {
+    int _year = DateTime.Now.Year;
+    int _month = DateTime.Now.Month;
+    List<BandMixDto> _results = [];
+    bool _loading;
+
+    protected override async Task OnInitializedAsync() => await Calculate();
+
+    async Task Calculate()
+    {
+        _loading = true;
+        try { _results = await BandMixService.GetBandMixAsync(_year, _month); }
+        catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+        finally { _loading = false; }
+    }
+}

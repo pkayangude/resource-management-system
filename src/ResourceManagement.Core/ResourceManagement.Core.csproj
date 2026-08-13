@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>ResourceManagement.Core</RootNamespace>
+  </PropertyGroup>
+  <!-- No external packages — keeps Core a pure domain layer with zero transitive deps -->
+</Project>

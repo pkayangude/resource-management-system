@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <!-- Copy all NuGet deps to output dir locally to avoid MAX_PATH issues with long OneDrive paths -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+</Project>

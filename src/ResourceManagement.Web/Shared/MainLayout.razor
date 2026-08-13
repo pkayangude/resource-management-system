@@ -1,0 +1,67 @@
+@using MudBlazor
+@using ResourceManagement.Web.Services
+@inherits LayoutComponentBase
+
+<MudThemeProvider Theme="_theme" />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1" Color="Color.Primary">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start"
+                       OnClick="@ToggleDrawer" />
+        <MudText Typo="Typo.h6" Class="ml-3">Resource Management System</MudText>
+        <MudSpacer />
+        <MudText Typo="Typo.body2" Color="Color.Inherit">IBM | GDC Operations</MudText>
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
+        <MudNavMenu>
+            <MudText Typo="Typo.overline" Class="px-4 pt-4 pb-2 mud-text-disabled">MAIN</MudText>
+            <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">
+                Dashboard
+            </MudNavLink>
+            <MudDivider Class="my-2" />
+            <MudText Typo="Typo.overline" Class="px-4 pt-2 pb-2 mud-text-disabled">RESOURCES</MudText>
+            <MudNavLink Href="/resources" Icon="@Icons.Material.Filled.People">Resources</MudNavLink>
+            <MudNavLink Href="/resources/onboard" Icon="@Icons.Material.Filled.PersonAdd">Onboarding</MudNavLink>
+            <MudNavLink Href="/resources/import" Icon="@Icons.Material.Filled.Upload">Bulk Import</MudNavLink>
+            <MudDivider Class="my-2" />
+            <MudText Typo="Typo.overline" Class="px-4 pt-2 pb-2 mud-text-disabled">PLANNING</MudText>
+            <MudNavLink Href="/forecast" Icon="@Icons.Material.Filled.CalendarMonth">Forecast</MudNavLink>
+            <MudNavLink Href="/ilc" Icon="@Icons.Material.Filled.AccessTime">ILC Clocking</MudNavLink>
+            <MudNavLink Href="/leave" Icon="@Icons.Material.Filled.BeachAccess">Long Leaves</MudNavLink>
+            <MudDivider Class="my-2" />
+            <MudText Typo="Typo.overline" Class="px-4 pt-2 pb-2 mud-text-disabled">PROJECTS</MudText>
+            <MudNavLink Href="/projects" Icon="@Icons.Material.Filled.Assignment">Projects &amp; Demands</MudNavLink>
+            <MudNavLink Href="/bandmix" Icon="@Icons.Material.Filled.BarChart">Band Mix</MudNavLink>
+            <MudDivider Class="my-2" />
+            <MudText Typo="Typo.overline" Class="px-4 pt-2 pb-2 mud-text-disabled">ANALYTICS</MudText>
+            <MudNavLink Href="/skillmatrix" Icon="@Icons.Material.Filled.Psychology">Skill Matrix</MudNavLink>
+        </MudNavMenu>
+    </MudDrawer>
+
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.False" Class="pa-4">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    bool _drawerOpen = true;
+
+    MudTheme _theme = new()
+    {
+        PaletteLight = new PaletteLight
+        {
+            Primary = "#1565C0",
+            Secondary = "#7c5cd8",
+            AppbarBackground = "#1565C0",
+            Background = "#f7f8fa",
+            Surface = "#ffffff"
+        }
+    };
+
+    void ToggleDrawer() => _drawerOpen = !_drawerOpen;
+}

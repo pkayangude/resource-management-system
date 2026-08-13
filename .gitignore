@@ -1,0 +1,36 @@
+﻿## Build output
+[Bb]in/
+[Oo]bj/
+TestResults/
+out/
+publish/
+
+## Logs
+logs/
+*.log
+
+## Visual Studio
+*.user
+*.suo
+.vs/
+.vscode/settings.json
+
+## NuGet
+*.nupkg
+packages/
+nuget/
+
+## Secrets
+appsettings.Production.json
+.env
+.env.*
+*.pfx
+*.p12
+
+## OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+## .NET / Blazor
+wwwroot/dist/

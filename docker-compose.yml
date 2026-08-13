@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      SA_PASSWORD: "${SQL_SA_PASSWORD}"
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Developer"
+    ports:
+      - "127.0.0.1:1433:1433"
+    volumes:
+      - sqldata:/var/opt/mssql
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: src/ResourceManagement.API/Dockerfile
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Server=db;Database=ResourceManagement;User Id=sa;Password=${SQL_SA_PASSWORD};TrustServerCertificate=True
+      - AllowedOrigins__0=http://localhost:5174
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      - db
+    restart: unless-stopped
+
+volumes:
+  sqldata:

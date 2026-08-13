@@ -1,0 +1,97 @@
+@page "/forecast"
+@inject IForecastApiService ForecastService
+@inject ISnackbar Snackbar
+
+<PageTitle>Forecast – Resource Management</PageTitle>
+<MudText Typo="Typo.h5" Class="page-title">Resource Forecast</MudText>
+<MudText Typo="Typo.body1" Class="mb-4 mud-text-disabled">
+    Forecast considers 9 hours/day × working days × FTE fraction per resource per month.
+    Working days exclude weekends and public holidays (imported annually).
+</MudText>
+
+<MudStack Row Spacing="3" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudNumericField @bind-Value="_year" Label="Year" Min="2024" Max="2030" Style="width:120px" />
+    <MudNumericField @bind-Value="_month" Label="Month" Min="1" Max="12" Style="width:100px" />
+    <MudButton Variant="Variant.Outlined" OnClick="LoadForecast">Load Forecast</MudButton>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="GenerateForecast"
+               Disabled="_generating">
+        @if (_generating) { <MudProgressCircular Size="Size.Small" Indeterminate /> }
+        Generate Missing Forecasts
+    </MudButton>
+</MudStack>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_allocations.Any())
+{
+    <MudStack Row Spacing="4" Class="mb-3">
+        <MudChip T="string" Color="Color.Primary">
+            Total Forecast: @_allocations.Sum(a => a.ForecastHours).ToString("F0") hrs
+        </MudChip>
+        <MudChip T="string" Color="Color.Success">
+            Total Actual: @_allocations.Sum(a => a.ActualHours ?? 0).ToString("F0") hrs
+        </MudChip>
+        <MudChip T="string" Color="Color.Info">
+            Resources: @_allocations.Count
+        </MudChip>
+    </MudStack>
+
+    <MudDataGrid T="ForecastAllocationDto" Items="_allocations" Dense="true" Striped="true" Bordered="true" Filterable="true">
+        <Columns>
+            <PropertyColumn Property="a => a.ResourceName" Title="Resource" />
+            <PropertyColumn Property="a => a.Band" Title="Band" />
+            <PropertyColumn Property="a => a.FteFraction" Title="FTE" Format="F2" />
+            <PropertyColumn Property="a => a.ForecastHours" Title="Forecast Hrs" Format="F1" />
+            <PropertyColumn Property="a => a.ForecastCost" Title="Forecast Cost" Format="C0" />
+            <PropertyColumn Property="a => a.ActualHours" Title="Actual Hrs (ILC)" Format="F1" />
+            <TemplateColumn Title="Variance">
+                <CellTemplate Context="ctx">
+                    @if (ctx.Item.VarianceHours.HasValue)
+                    {
+                        var v = ctx.Item.VarianceHours.Value;
+                        <MudText Color="@(v < 0 ? Color.Error : v > 0 ? Color.Warning : Color.Success)">
+                            @v.ToString("F1")
+                        </MudText>
+                    }
+                </CellTemplate>
+            </TemplateColumn>
+            <PropertyColumn Property="a => a.Comments" Title="Comments" />
+        </Columns>
+    </MudDataGrid>
+}
+else
+{
+    <MudAlert Severity="Severity.Info">No forecast data for @_year/@_month. Click "Generate Missing Forecasts" to create them.</MudAlert>
+}
+
+@code {
+    int _year = DateTime.Now.Year;
+    int _month = DateTime.Now.Month;
+    List<ForecastAllocationDto> _allocations = [];
+    bool _loading, _generating;
+
+    protected override async Task OnInitializedAsync() => await LoadForecast();
+
+    async Task LoadForecast()
+    {
+        _loading = true;
+        try { _allocations = await ForecastService.GetByMonthAsync(_year, _month); }
+        catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+        finally { _loading = false; }
+    }
+
+    async Task GenerateForecast()
+    {
+        _generating = true;
+        try
+        {
+            await ForecastService.GenerateMonthlyForecastAsync(_year, _month);
+            Snackbar.Add("Forecasts generated successfully", Severity.Success);
+            await LoadForecast();
+        }
+        catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+        finally { _generating = false; }
+    }
+}

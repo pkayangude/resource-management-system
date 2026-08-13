@@ -1,0 +1,200 @@
+@page "/ilc"
+@inject IIlcApiService IlcService
+@inject ISnackbar Snackbar
+
+<PageTitle>ILC Clocking – Resource Management</PageTitle>
+<MudText Typo="Typo.h5" Class="page-title">ILC Labour Claiming (ILC) Validation</MudText>
+<MudText Typo="Typo.body1" Class="mb-4 mud-text-disabled">
+    Upload the weekly ILC Excel file, map columns, and validate claims against forecast hours and project budgets.
+    9 hours/day and 45 hours/week apply.
+</MudText>
+
+<MudTabs Elevation="1" Rounded="true" ApplyEffectsToContainer="true">
+    <MudTabPanel Text="Upload Weekly Claims">
+        <MudPaper Class="pa-4" Elevation="0">
+            <MudStack Spacing="4">
+                <MudPaper Class="pa-4 upload-dropzone" Elevation="0">
+                    <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Large" Color="Color.Secondary" />
+                    <MudText Typo="Typo.h6" Class="mt-2">Upload ILC Weekly Excel</MudText>
+                    <InputFile id="ilcFile" accept=".xlsx" OnChange="HandleIlcFile" style="display:none" />
+                    <label for="ilcFile">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Class="mt-2">
+                            Choose Weekly ILC File
+                        </MudButton>
+                    </label>
+                    @if (_fileName is not null)
+                    {
+                        <MudChip T="string" Icon="@Icons.Material.Filled.InsertDriveFile" Color="Color.Secondary" Class="mt-2">
+                            @_fileName (@_totalRows rows)
+                        </MudChip>
+                    }
+                </MudPaper>
+
+                @if (_preview is not null)
+                {
+                    <MudDivider />
+                    <MudText Typo="Typo.subtitle1">Map ILC Columns</MudText>
+                    <MudTable Items="_ilcMappings" Dense="true" Bordered="true">
+                        <HeaderContent>
+                            <MudTh>Field</MudTh>
+                            <MudTh>Your Column</MudTh>
+                        </HeaderContent>
+                        <RowTemplate Context="fm">
+                            <MudTd>@fm.Label @(fm.Required ? "*" : "")</MudTd>
+                            <MudTd>
+                                <MudSelect T="string" @bind-Value="fm.MappedColumn" Dense="true">
+                                    <MudSelectItem T="string" Value="@("")">-- Skip --</MudSelectItem>
+                                    @foreach (var h in (_preview?.Headers ?? []))
+                                    {
+                                        <MudSelectItem T="string" Value="@h">@h</MudSelectItem>
+                                    }
+                                </MudSelect>
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+
+                    <MudTextField @bind-Value="_uploadedBy" Label="Uploaded By" Placeholder="Your Name/Email" />
+
+                    <MudButton Variant="Variant.Filled" Color="Color.Secondary" OnClick="DoUpload"
+                               Disabled="_uploading">
+                        @if (_uploading) { <MudProgressCircular Size="Size.Small" Indeterminate /> }
+                        Upload & Validate
+                    </MudButton>
+                }
+
+                @if (_uploadResult is not null)
+                {
+                    <MudAlert Severity="@(_uploadResult.Success ? Severity.Success : Severity.Warning)">
+                        @_uploadResult.Summary
+                    </MudAlert>
+                    <MudStack Row Spacing="3">
+                        <MudChip T="string" Color="Color.Success">Imported: @_uploadResult.ImportedCount</MudChip>
+                        <MudChip T="string" Color="Color.Warning">Skipped: @_uploadResult.SkippedCount</MudChip>
+                        <MudChip T="string" Color="Color.Error">Errors: @_uploadResult.ErrorCount</MudChip>
+                    </MudStack>
+                }
+            </MudStack>
+        </MudPaper>
+    </MudTabPanel>
+
+    <MudTabPanel Text="View Claims by Week">
+        <MudPaper Class="pa-4" Elevation="0">
+            <MudStack Row Spacing="3" AlignItems="AlignItems.Center" Class="mb-3">
+                <MudDatePicker Label="Week Ending Date" @bind-Date="_weekEndDate" DateFormat="yyyy-MM-dd" />
+                <MudButton Variant="Variant.Outlined" OnClick="LoadByWeek">Load</MudButton>
+            </MudStack>
+
+            @if (_weekClaims.Any())
+            {
+                <MudDataGrid T="IlcClaimDto" Items="_weekClaims" Dense="true" Striped="true" Bordered="true">
+                    <Columns>
+                        <PropertyColumn Property="c => c.ResourceName" Title="Resource" />
+                        <PropertyColumn Property="c => c.ClaimedHours" Title="Claimed Hrs" Format="F1" />
+                        <PropertyColumn Property="c => c.ProjectName" Title="Project" />
+                        <PropertyColumn Property="c => c.ClaimCode" Title="Claim Code" />
+                        <TemplateColumn Title="Status">
+                            <CellTemplate Context="ctx">
+                                <MudChip T="string" Size="Size.Small"
+                                         Color="@GetValidationColor(ctx.Item.ValidationStatus)">
+                                    @ctx.Item.ValidationStatus
+                                </MudChip>
+                            </CellTemplate>
+                        </TemplateColumn>
+                        <TemplateColumn Title="Flags">
+                            <CellTemplate Context="ctx">
+                                @if (ctx.Item.ExceedsForecast)
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error"
+                                             Title="Exceeds forecast" Size="Size.Small" />
+                                }
+                                @if (ctx.Item.ExceedsProjectBudget)
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.MoneyOff" Color="Color.Error"
+                                             Title="Exceeds project budget" Size="Size.Small" />
+                                }
+                            </CellTemplate>
+                        </TemplateColumn>
+                        <PropertyColumn Property="c => c.ValidationMessages" Title="Messages" />
+                    </Columns>
+                </MudDataGrid>
+            }
+        </MudPaper>
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    string? _fileName;
+    int _totalRows;
+    ExcelPreviewResult? _preview;
+    IBrowserFile? _file;
+    ImportResult? _uploadResult;
+    bool _uploading;
+    string _uploadedBy = string.Empty;
+    DateTime? _weekEndDate = DateTime.Today;
+    List<IlcClaimDto> _weekClaims = [];
+
+    class IlcFieldMapping { public string Key = ""; public string Label = ""; public bool Required; public string MappedColumn = ""; }
+
+    readonly List<IlcFieldMapping> _ilcMappings =
+    [
+        new() { Key = "TalentId", Label = "Talent ID", Required = false },
+        new() { Key = "EmpId", Label = "Emp ID", Required = false },
+        new() { Key = "WeekEndingDate", Label = "Week Ending Date", Required = true },
+        new() { Key = "ClaimedHours", Label = "Claimed Hours", Required = true },
+        new() { Key = "ClaimCode", Label = "Claim Code", Required = false },
+        new() { Key = "ProjectName", Label = "Project Name", Required = false },
+        new() { Key = "ProjectDbId", Label = "Project DB ID", Required = false },
+        new() { Key = "DemandCode", Label = "Demand Code", Required = false }
+    ];
+
+    async Task HandleIlcFile(InputFileChangeEventArgs e)
+    {
+        _file = e.File;
+        _fileName = e.File.Name;
+        try
+        {
+            await using var stream = _file.OpenReadStream(10_485_760);
+            _preview = await IlcService.PreviewFileAsync(stream, _fileName);
+            _totalRows = _preview?.TotalRows ?? 0;
+
+            foreach (var fm in _ilcMappings)
+            {
+                var match = _preview?.Headers?.FirstOrDefault(h =>
+                    h.Equals(fm.Label, StringComparison.OrdinalIgnoreCase) ||
+                    h.Equals(fm.Key, StringComparison.OrdinalIgnoreCase));
+                if (match is not null) fm.MappedColumn = match;
+            }
+        }
+        catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+    }
+
+    async Task DoUpload()
+    {
+        if (_file is null) return;
+        _uploading = true;
+        try
+        {
+            var mapping = _ilcMappings.Where(m => !string.IsNullOrEmpty(m.MappedColumn))
+                .ToDictionary(m => m.Key, m => m.MappedColumn);
+            await using var stream = _file.OpenReadStream(10_485_760);
+            _uploadResult = await IlcService.UploadAsync(stream, _fileName!, mapping, _uploadedBy);
+        }
+        catch (Exception ex) { Snackbar.Add($"Upload failed: {ex.Message}", Severity.Error); }
+        finally { _uploading = false; }
+    }
+
+    async Task LoadByWeek()
+    {
+        if (!_weekEndDate.HasValue) return;
+        try { _weekClaims = await IlcService.GetByWeekAsync(_weekEndDate.Value); }
+        catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+    }
+
+    Color GetValidationColor(string status) => status switch
+    {
+        "Valid" => Color.Success,
+        "Warning" => Color.Warning,
+        "Invalid" => Color.Error,
+        _ => Color.Default
+    };
+}

@@ -1,0 +1,75 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  DOTNET_VERSION: '8.0.x'
+
+jobs:
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore & Build
+        run: |
+          dotnet restore ResourceManagement.sln
+          dotnet build ResourceManagement.sln --configuration Release --no-restore
+
+      - name: Run Tests
+        run: dotnet test tests/ResourceManagement.Tests/ResourceManagement.Tests.csproj --configuration Release --no-build
+
+      - name: Publish API
+        run: dotnet publish src/ResourceManagement.API/ResourceManagement.API.csproj -c Release -o ./publish/api
+
+      - name: Publish Web
+        run: dotnet publish src/ResourceManagement.Web/ResourceManagement.Web.csproj -c Release -o ./publish/web
+
+      - name: Create release archives
+        run: |
+          cd ./publish/api && zip -r ../../resource-management-api-${{ github.ref_name }}.zip .
+          cd ./publish/web && zip -r ../../resource-management-web-${{ github.ref_name }}.zip .
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Resource Management System ${{ github.ref_name }}
+          body: |
+            ## Resource Management System ${{ github.ref_name }}
+            
+            ### What's Included
+            - Resource Onboarding & Offboarding
+            - Forecast Allocation (9 hrs/day, 45 hrs/week)
+            - ILC Labour Claim Validation with weekly xlsx upload
+            - Long Leave Management
+            - Project & Demand Budget Tracking
+            - Band Mix Calculator
+            - Skill Matrix
+            - Bulk xlsx import with column mapping
+            
+            ### Deployment
+            1. Extract `resource-management-api-*.zip` to your IIS / App Service
+            2. Update `appsettings.json` with your SQL Server connection string
+            3. Run `dotnet ef database update` for migrations
+            4. Extract `resource-management-web-*.zip` to static hosting / wwwroot
+          files: |
+            resource-management-api-${{ github.ref_name }}.zip
+            resource-management-web-${{ github.ref_name }}.zip
+          draft: false
+          prerelease: false
