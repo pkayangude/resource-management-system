@@ -50,10 +50,13 @@ public class IlcValidationRuleTests
         => Assert.Equal(shouldExceed, (consumed + newClaim) > budget);
 
     [Theory]
-    [InlineData(198, 198, false)]
-    [InlineData(190, 198, false)]
-    [InlineData(217, 198, true)]
-    [InlineData(180, 198, false)]
+    [InlineData(198,   198, false)]   // exactly at forecast — no overrun
+    [InlineData(190,   198, false)]   // below forecast — no overrun
+    [InlineData(218,   198, true)]    // 218 > 198*1.10=217.8 — overrun
+    [InlineData(217,   198, false)]   // 217 < 217.8 — NOT overrun (boundary)
+    [InlineData(220,   200, false)]   // 220 = 200*1.10=220 exactly — NOT overrun
+    [InlineData(221,   200, true)]    // 221 > 220 — overrun
+    [InlineData(180,   198, false)]   // well below — no overrun
     public void MonthlyHours_ForecastOverrun_TenPercentThreshold(decimal actual, decimal forecast, bool expectsOverrun)
         => Assert.Equal(expectsOverrun, actual > forecast * 1.10m);
 }
