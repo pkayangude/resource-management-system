@@ -1,0 +1,33 @@
+# Dockerfile.ci — CI/CD build image using publicly available Microsoft base images
+# Used when Red Hat registry credentials (RH_REGISTRY_USER secret) are not set.
+#
+# For PRODUCTION deployments, use Dockerfile (Red Hat UBI9) which requires
+# registry.redhat.io credentials stored as GitHub secrets:
+#   RH_REGISTRY_USER     → your Red Hat account username
+#   RH_REGISTRY_PASSWORD → your Red Hat account password or service account token
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
+WORKDIR /app
+EXPOSE 8080
+EXPOSE 8443
+
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+COPY ["src/ResourceManagement.API/ResourceManagement.API.csproj",         "src/ResourceManagement.API/"]
+COPY ["src/ResourceManagement.Core/ResourceManagement.Core.csproj",        "src/ResourceManagement.Core/"]
+COPY ["src/ResourceManagement.Infrastructure/ResourceManagement.Infrastructure.csproj", "src/ResourceManagement.Infrastructure/"]
+RUN dotnet restore "src/ResourceManagement.API/ResourceManagement.API.csproj"
+COPY . .
+WORKDIR "/src/src/ResourceManagement.API"
+RUN dotnet build "ResourceManagement.API.csproj" -c Release -o /app/build
+
+FROM build AS publish
+RUN dotnet publish "ResourceManagement.API.csproj" -c Release -o /app/publish --no-restore
+
+FROM base AS final
+WORKDIR /app
+# Non-root user (security requirement)
+RUN adduser --disabled-password --uid 1001 appuser
+USER 1001
+COPY --from=publish --chown=1001:1001 /app/publish .
+ENTRYPOINT ["dotnet", "ResourceManagement.API.dll"]
