@@ -9,10 +9,10 @@ on:
 
 env:
   DOTNET_VERSION: '8.0.x'
-  API_PROJECT: src/ResourceManagement.API/ResourceManagement.API.csproj
-  WEB_PROJECT: src/ResourceManagement.Web/ResourceManagement.Web.csproj
+  API_PROJECT:  src/ResourceManagement.API/ResourceManagement.API.csproj
+  WEB_PROJECT:  src/ResourceManagement.Web/ResourceManagement.Web.csproj
   TEST_PROJECT: tests/ResourceManagement.Tests/ResourceManagement.Tests.csproj
-  SOLUTION: ResourceManagement.sln
+  SOLUTION:     ResourceManagement.sln
 
 jobs:
   # ─────────────────────────── BUILD & TEST ────────────────────────────────────
@@ -29,7 +29,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup .NET ${{ env.DOTNET_VERSION }}
+      - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
@@ -47,28 +47,21 @@ jobs:
       - name: Build solution (Release)
         run: dotnet build ${{ env.SOLUTION }} --configuration Release --no-restore
 
-      - name: Run unit tests with coverage
+      - name: Run unit tests
         run: |
           dotnet test ${{ env.TEST_PROJECT }} \
             --configuration Release \
             --no-build \
             --logger "trx;LogFileName=test-results.trx" \
-            --collect:"XPlat Code Coverage" \
             --results-directory ./test-results
 
-      - name: Publish test results
-        uses: dorny/test-reporter@v1
-        if: success() || failure()
-        with:
-          name: .NET Test Results
-          path: './test-results/*.trx'
-          reporter: dotnet-trx
-
-      - name: Upload coverage report
+      - name: Upload test results
         uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: coverage-report
-          path: ./test-results/**/coverage.cobertura.xml
+          name: test-results
+          path: ./test-results/
+          retention-days: 7
 
   # ─────────────────────────── SECURITY SCAN ───────────────────────────────────
   security-scan:
@@ -83,10 +76,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup .NET
+      - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore ${{ env.SOLUTION }}
 
       - name: Run dotnet vulnerability audit
         run: dotnet list ${{ env.SOLUTION }} package --vulnerable --include-transitive 2>&1 | tee vuln-report.txt || true
@@ -104,7 +100,7 @@ jobs:
           languages: csharp
 
       - name: Build for CodeQL
-        run: dotnet build ${{ env.SOLUTION }} --configuration Release
+        run: dotnet build ${{ env.SOLUTION }} --configuration Release --no-restore
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
@@ -120,10 +116,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup .NET
+      - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore ${{ env.SOLUTION }}
 
       - name: Publish API
         run: |
@@ -150,10 +149,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup .NET
+      - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore ${{ env.SOLUTION }}
 
       - name: Publish Web
         run: |
@@ -183,7 +185,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build API Docker image (no push – registry TBD)
+      - name: Build API Docker image
         run: |
           docker build \
             -f src/ResourceManagement.API/Dockerfile \
@@ -199,7 +201,7 @@ jobs:
             --severity CRITICAL \
             resource-management-api:latest || echo "Trivy scan completed"
 
-  # ─────────────────────────── DB MIGRATION CHECK ──────────────────────────────
+  # ─────────────────────────── EF MIGRATION CHECK ──────────────────────────────
   migration-check:
     name: EF Migration Validation
     runs-on: ubuntu-latest
@@ -209,7 +211,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup .NET
+      - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
